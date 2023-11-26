@@ -1,0 +1,17 @@
+[book]
+authors = ["Laurens Weitkamp"]
+description = "A simple guide to getting started with OpenAI's Triton language."
+language = "en"
+multilingual = false
+src = "src"
+title = "Triton Guide"
+
+[output.html]
+mathjax-support = true
+
+[output.html.code.hidelines]
+python = ":::"
+
+# Fold side bar
+[output.html.fold]
+enable = false
