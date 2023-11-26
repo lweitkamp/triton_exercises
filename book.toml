@@ -4,7 +4,7 @@ description = "A simple guide to getting started with OpenAI's Triton language."
 language = "en"
 multilingual = false
 src = "src"
-title = "Triton Guide"
+title = "Triton Exercises"
 
 [output.html]
 mathjax-support = true
