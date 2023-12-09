@@ -1,16 +1,18 @@
-# Triton Kernels
+<!-- # Triton Kernels
 
-We can divide most Triton implementations into two parts: the *kernel* and the *launch grid*. The kernel is where the computation happens and the launch grid is where we define how many programs will be launched and how they will be distributed over the data. We will tackle it in reverse order, discussing the launch grid first, using the vector addition from the [Triton Tutorials](https://triton-lang.org/main/getting-started/tutorials/01-vector-add.html) as an example.
+We can divide most Triton implementations into two parts: the *kernel* and the *launch grid*. The kernel is where the computation happens and the launch grid is where we define how many programs will be launched and how they will be distributed over the data. We will tackle it in reverse order, discussing the launch grid first, using the vector addition from the [Triton Tutorials](https://triton-lang.org/main/getting-started/tutorials/01-vector-add.html) as an example. -->
 
-## The Launch Grid
+
+<!-- 
+
 
 Before running a Triton kernel we need to define specific parameters that define how the compiler will utilize the GPU.
 For example, we need to define how many *programs* will be launched, and depending on how many programs we launch we might have to change the size of the *block(s)* that each program will work on. To make it a bit easier we typically wrap the launch grid and the kernel launch itself in a helper function. For the vector addition example it would make sense to call the kernel `add_kernel` and the helper function `add` (although you might want to post/pre-fix it with `triton`).
 
 The launch grid is set as a parameter when you launch the kernel: `kernel[grid](...)`. It is a tuple of integers (or a callable that returns a tuple of integers) where each value defines how many programs will be launched on that axis. In general we will define 1D launch grids and figure out how to map the data to the programs inside the kernel, but it is possible to define multidimensional launch grids if that makes more sense for your problem. Think of the grid as an abstraction to help you map the data to the programs.
 
-Below is the launch grid from the tutorial, I've hidden the comments since I thought they could be more confusing at this point.
-
+Below is the launch grid from the tutorial, I've hidden the comments since I thought they could be more confusing at this point. -->
+<!-- 
 ```python
 import torch
 import triton
@@ -100,4 +102,4 @@ Let's make this a bit more clear with the table below:
 
 A quick addition of the `offset` with the data pointer will give us the correct block to load. A masking mechanism ensures that we don't load data outside of the vector length. 
 
-The main setup of the kernel will typically be something along the lines of (1) load data, (2) transform data, and (3) store data. Let's take a look at a new way to load and store data in the next section.
+The main setup of the kernel will typically be something along the lines of (1) load data, (2) transform data, and (3) store data. Let's take a look at a new way to load and store data in the next section. -->

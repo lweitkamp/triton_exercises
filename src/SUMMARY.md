@@ -3,6 +3,7 @@
 # Introduction
 - [About]()
 - [The Basics]()
+  - [The Launch Grid](./introduction/launch_grid.md)
   - [Triton Kernels](./introduction/triton_kernels.md)
   - [Block Pointers](./introduction/block_pointers.md)
   - [Loading and Storing Data](./introduction/data_io.md)
