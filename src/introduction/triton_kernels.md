@@ -1,5 +1,54 @@
-<!-- # Triton Kernels
+# Triton Kernels
+A Triton kernel is written in the Triton domain specific language (DSL) and is compiled just-in-time using the `@jtriton.jit` decorator.
+Inside the kernel you can use specific Triton DSL operations that look surpisingly like Python. Let's look at the vector addition example from the tutorial site:
 
+```python
+import torch
+
+import triton
+import triton.language as tl
+
+
+@triton.jit
+def add_kernel(x_ptr,  # *Pointer* to first input vector.
+               y_ptr,  # *Pointer* to second input vector.
+               output_ptr,  # *Pointer* to output vector.
+               n_elements,  # Size of the vector.
+               BLOCK_SIZE: tl.constexpr,  # Number of elements each program should process.
+               # NOTE: `constexpr` so it can be used as a shape value.
+               ):
+:::    # There are multiple 'programs' processing different data. We identify which program
+:::    # we are here:
+    pid = tl.program_id(axis=0)  # We use a 1D launch grid so axis is 0.
+:::    # This program will process inputs that are offset from the initial data.
+:::    # For instance, if you had a vector of length 256 and block_size of 64, the programs
+:::    # would each access the elements [0:64, 64:128, 128:192, 192:256].
+:::    # Note that offsets is a list of pointers:
+    block_start = pid * BLOCK_SIZE
+    offsets = block_start + tl.arange(0, BLOCK_SIZE)
+:::    # Create a mask to guard memory operations against out-of-bounds accesses.
+    mask = offsets < n_elements
+:::    # Load x and y from DRAM, masking out any extra elements in case the input is not a
+:::    # multiple of the block size.
+    x = tl.load(x_ptr + offsets, mask=mask)
+    y = tl.load(y_ptr + offsets, mask=mask)
+    output = x + y
+    # Write x + y back to DRAM.
+    tl.store(output_ptr + offsets, output, mask=mask)
+```
+
+## `triton.jit`
+Functions to be decorated with the just in time compilation decorator have some requirements. 
+
+> talk about requirements
+
+Additionally, any `torch.Tensor` that is passed to the function is converted to a pointer towards its first value in memory. In the example above we simply pass some vector `x` and expect the value to be a pointer `x_ptr` inside of the kernel.
+
+There are a lot of added parameters when the decorator is added, most of them not well documented. I've attempted to make an exhaustive list in the table below.
+
+
+
+<!-- 
 We can divide most Triton implementations into two parts: the *kernel* and the *launch grid*. The kernel is where the computation happens and the launch grid is where we define how many programs will be launched and how they will be distributed over the data. We will tackle it in reverse order, discussing the launch grid first, using the vector addition from the [Triton Tutorials](https://triton-lang.org/main/getting-started/tutorials/01-vector-add.html) as an example. -->
 
 
