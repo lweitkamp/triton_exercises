@@ -1,7 +1,7 @@
 # The Launch Grid
-A Triton kernel will launch a number of *programs* to distribute the work over blocks of data. You might want to run more or less programs depending on how much your hardware can take, you can control the number of programs to be launched in the *launch grid*. It's a simple tuple (or callable that returns a tuple) that denotes the number of programs to be launched. Say we want to calculate the sum of rows of a matrix ***A***, we can make a simple decision to launch exactly the number of rows as programs with the launch grid `(num_rows, )`.
+A Triton kernel will launch a number of *programs* to distribute the work over blocks of data. You might want to run more or less programs depending on how much your hardware can handle, and you can control the number of programs to be launched in the *launch grid*. It's a simple tuple (or callable that returns a tuple) that denotes the number of programs to be launched. Say we want to calculate the sum of rows of a matrix ***A*** (`A.sum(axis=1)`), we can make a simple decision to launch exactly the number of rows as programs with the launch grid `(num_rows, )`.
 
-The figure below shows this configuration for with a launch grid of `(6, )`. PID is the *Program Identifier*, a way inside of the Triton kernel to identify the current program at work.
+The figure below shows this configuration with a launch grid of `(6, )`. PID is the ***Program Identifier***, a way inside of the Triton kernel to identify the current program at work.
 
 ![A 1 dimensional launch grid of 6 programs.](images/launch-grid-1d.svg)
 
@@ -12,7 +12,9 @@ Alternatively, we can divide the work between sets of rows and block of columns.
 
 ![A two dimensional launch grid of 3 times 2 programs.](images/launch-grid-2d.svg)
 
-The only difference here is step (2), where it now processes 2 rows and 2 columns for each program instead of a whole row. This change does have an effect on performance since we are no longer loading blocks of contiguous memory. Multidimensional launch grids are also not very common, or at least not from what I've seen. We will use it for the matrix multiplication exercise, but we will mostly stick to a 1 dimensional launch grid.
+The only difference here is step (2), where it now processes 2 rows and 2 columns for each program instead of a whole row. This change does have an effect on performance since we are no longer loading blocks of contiguous memory. 
+
+Multidimensional launch grids are not very common, or at least not from what I've seen. In the exercises we will mainly stick to 1D grids.
 
 ## In Code
 
@@ -36,5 +38,4 @@ def row_sum(A: torch.Tensor):
     return output
 ```
 
-This might not look very dynamic since we hard code the value of `BLOCK_SIZE`, but we will figure out later how to set
-this value almost optimally in the optimization section.
+Of course, we have hard-coded the value of `BLOCK_SIZE=1` above. We will see ways of dynamically changing this in the [Optimization](/optimization/optimization.md) chapter.
