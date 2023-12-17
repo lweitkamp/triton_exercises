@@ -17,19 +17,19 @@ def add_kernel(x_ptr,  # *Pointer* to first input vector.
                BLOCK_SIZE: tl.constexpr,  # Number of elements each program should process.
                # NOTE: `constexpr` so it can be used as a shape value.
                ):
-:::    # There are multiple 'programs' processing different data. We identify which program
-:::    # we are here:
+~    # There are multiple 'programs' processing different data. We identify which program
+~    # we are here:
     pid = tl.program_id(axis=0)  # We use a 1D launch grid so axis is 0.
-:::    # This program will process inputs that are offset from the initial data.
-:::    # For instance, if you had a vector of length 256 and block_size of 64, the programs
-:::    # would each access the elements [0:64, 64:128, 128:192, 192:256].
-:::    # Note that offsets is a list of pointers:
+~    # This program will process inputs that are offset from the initial data.
+~    # For instance, if you had a vector of length 256 and block_size of 64, the programs
+~    # would each access the elements [0:64, 64:128, 128:192, 192:256].
+~    # Note that offsets is a list of pointers:
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
-:::    # Create a mask to guard memory operations against out-of-bounds accesses.
+~    # Create a mask to guard memory operations against out-of-bounds accesses.
     mask = offsets < n_elements
-:::    # Load x and y from DRAM, masking out any extra elements in case the input is not a
-:::    # multiple of the block size.
+~    # Load x and y from DRAM, masking out any extra elements in case the input is not a
+~    # multiple of the block size.
     x = tl.load(x_ptr + offsets, mask=mask)
     y = tl.load(y_ptr + offsets, mask=mask)
     output = x + y
@@ -44,9 +44,27 @@ Functions to be decorated with the just in time compilation decorator have some 
 
 Additionally, any `torch.Tensor` that is passed to the function is converted to a pointer towards its first value in memory. In the example above we simply pass some vector `x` and expect the value to be a pointer `x_ptr` inside of the kernel.
 
-There are a lot of added parameters when the decorator is added, most of them not well documented. I've attempted to make an exhaustive list in the table below.
+There are a lot of parameters that come with the jit decorator, most of them not well documented. You can run into all of them if you accidentally forget to add arguments to the kernel and run it:
+
+```python
+import triton
+
+@triton.jit
+def do_nothing():
+   pass
 
 
+do_nothing[(1, )]()
+
+>>> def do_nothing( , grid=None, num_warps=4, num_stages=3, extern_libs=None, stream=None, warmup=False, device=None, device_type=None):
+                   ^
+SyntaxError: invalid syntax
+```
+
+I've briefly documented the parameters in the table below.
+
+## Triton's Domain Specific Language
+Inside a kernel you can do...
 
 <!-- 
 We can divide most Triton implementations into two parts: the *kernel* and the *launch grid*. The kernel is where the computation happens and the launch grid is where we define how many programs will be launched and how they will be distributed over the data. We will tackle it in reverse order, discussing the launch grid first, using the vector addition from the [Triton Tutorials](https://triton-lang.org/main/getting-started/tutorials/01-vector-add.html) as an example. -->

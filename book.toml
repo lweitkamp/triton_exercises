@@ -9,8 +9,6 @@ title = "Triton Exercises"
 [output.html]
 mathjax-support = true
 
-[output.html.code.hidelines]
-python = ":::"
 
 # Fold side bar
 [output.html.fold]
