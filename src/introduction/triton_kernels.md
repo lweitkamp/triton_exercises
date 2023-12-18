@@ -10,6 +10,14 @@ def f(x, y, z):
     return x + y + z
 ```
 
+```python,hidelines=!!!
+!!!hidden()
+nothidden():
+!!!    hidden()
+    !!!hidden()
+    nothidden()
+```
+
 
 ```python
 import torch
