@@ -3,12 +3,12 @@ A Triton kernel is written in the Triton domain specific language (DSL) and is c
 Inside the kernel you can use specific Triton DSL operations that look surpisingly like Python. Let's look at the vector addition example from the tutorial site:
 
 ```python,hidelines=~
-import torch
-
-import triton
-import triton.language as tl
-
-
+~import torch
+~
+~import triton
+~import triton.language as tl
+~
+~
 @triton.jit
 def add_kernel(x_ptr,  # *Pointer* to first input vector.
                y_ptr,  # *Pointer* to second input vector.
