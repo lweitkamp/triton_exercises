@@ -2,24 +2,7 @@
 A Triton kernel is written in the Triton domain specific language (DSL) and is compiled just-in-time using the `@jtriton.jit` decorator.
 Inside the kernel you can use specific Triton DSL operations that look surpisingly like Python. Let's look at the vector addition example from the tutorial site:
 
-```python,hidelines=!!!
-import torch
-!!!import triton
-def f(x, y, z):
-    !!!"""bla bla bla"""
-    return x + y + z
-```
-
-```python,hidelines=!!!
-!!!hidden()
-nothidden():
-!!!    hidden()
-    !!!hidden()
-    nothidden()
-```
-
-
-```python
+```python,hidelines=~
 import torch
 
 import triton
