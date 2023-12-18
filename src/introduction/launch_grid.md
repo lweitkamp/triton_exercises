@@ -20,7 +20,7 @@ Multidimensional launch grids are not very common, or at least not from what I'v
 
 If we have a Triton kernel `row_sum_kernel` we can define its launch grid before the function call: `row_sum_kernel[(6, )](arg1, arg2, ...)`. We've mentioned before that the launch grid can also be a callable that returns a tuple, and this is the common way of defining the launch grid. The added benefit is that we can dynamically specify the number of programs to launch:
 
-```python
+```python,hidelines=~
 ~import torch
 ~import triton
 ~
