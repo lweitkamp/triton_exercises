@@ -46,16 +46,14 @@ Additionally, any `torch.Tensor` that is passed to the function is converted to 
 
 There are a lot of parameters that come with the jit decorator, most of them not well documented. You can run into all of them if you accidentally forget to add arguments to the kernel and run it:
 
-```python
-import triton
-
+```python,hidelines=~
+~import triton
+~
 @triton.jit
 def do_nothing():
    pass
 
-
 do_nothing[(1, )]()
-
 >>> def do_nothing( , grid=None, num_warps=4, num_stages=3, extern_libs=None, stream=None, warmup=False, device=None, device_type=None):
                    ^
 SyntaxError: invalid syntax
