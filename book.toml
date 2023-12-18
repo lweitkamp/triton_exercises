@@ -9,5 +9,8 @@ title = "Triton Exercises"
 [output.html]
 mathjax-support = true
 
+[output.html.code.hidelines]
+python = ":::"
+
 [output.html.fold]
 enable = false

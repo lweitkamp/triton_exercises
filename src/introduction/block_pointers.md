@@ -1,7 +1,7 @@
 # Block Pointers
 This guide relies heavily on a newly added and still experimental feature in Triton called Block Pointers. In the original blog post and in most of the (current) tutorials, data is loaded through pointer arithmetic. Take a look at the compute kernel from the vector addition tutorial, truncated here to highlight only the pointer arithmetic:
 
-```python,hidelines=:::
+```python
 :::import torch
 :::
 :::import triton
@@ -61,7 +61,7 @@ With the block pointer feature we can simplify this logic by creating a block po
       order=(0, ),
     )
     x = tl.load(x_block_ptr)
-:::)
+:::
 ```
 
 We do add more lines (you can squeeze it into three lines if you'd like), but I would argue it also makes reading the code easier.
