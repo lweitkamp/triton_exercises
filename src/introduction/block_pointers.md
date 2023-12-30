@@ -79,7 +79,7 @@ def sum_kernel(A_ptr, outputs_ptr, M, N, A_strides_x, A_strides_y):
         order=(1, 0),
     )
 ```
-A little bit more work and more added arguments, but this allows us to load 1D and 2D blocks with ease, and we can also skip any masking for out-of-bounds memory access. The table below gives a brief description per argument.
+A little bit more work and more added arguments, but this allows us to load 1D and 2D blocks with ease, and we can also skip any masking for out-of-bounds memory access. The table below gives a brief description per argument[^1].
 
 | abc         | def |
 |-------------|-----|
@@ -140,3 +140,5 @@ for _ in range(0, N, BLOCK_N):
 ```
 
 There are some consequences in terms of out-of-bounds memory access checking, but we will cover this is the next section.
+
+[^1]: There is more information available in the official Triton docs for the [Blocked Pointer Matrix Multiplication](https://triton-lang.org/main/getting-started/tutorials/08-experimental-block-pointer.html#make-a-block-pointer) tutorial.
