@@ -3,6 +3,7 @@
 # Table of Content
 - [About]()
 - [Getting Started](./introduction/getting_started.md)
+  - [Blocked Algorithms](./introduction/blocked_algorithms.md)
   - [The Launch Grid](./introduction/launch_grid.md)
   - [Triton Kernels](./introduction/triton_kernels.md)
   - [Block Pointers](./introduction/block_pointers.md)
