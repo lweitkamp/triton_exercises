@@ -7,36 +7,32 @@ As an example, lets try to calculate the sum of rows of an \\(6 \times 4\\) matr
 
 ![A 1 dimensional launch grid of 6 programs.](images/launch-grid-1d.svg)
 
-And it's not much work in python as you can see in the code snippet below:
+The matrix \\(A\\) is on the left, Triton launches 6 programs each that load a row and store the sum in the output vector. It's not much effort to define the launch grid in python as you can see in the code snippet below:
 
 ```python
 :::import torch
 :::
 :::
-def sum_row(inputs: torch.Tensor) -> torch.Tensor:
-:::    """Calculate the sum of a tensor along the final dim.
+def sum_row(A: torch.Tensor) -> torch.Tensor:
+:::    """Calculate the sum of a tensor A along the final dim.
 :::
 :::    Args:
-:::        inputs: Tensor of shape (M, N) containing the input values.
+:::        A: Tensor of shape (M, N) containing the input values.
 :::
 :::    Returns:
 :::        Tensor of shape (M, ) containing the summed values.
 :::    """
-    M, N = inputs.shape
-    outputs = torch.empty((M,), dtype=inputs.dtype, device=inputs.device)
+    M, N = A.shape
+    outputs = torch.empty((M,), dtype=A.dtype, device=A.device)
 
     launch_grid = (M, )
 
-    sum_kernel[launch_grid](
-        input_ptr=inputs, output_ptr=outputs,
-        M=M, N=N,
-        input_stride_x=inputs.stride(0), input_stride_y=inputs.stride(1),
-    )
+    sum_kernel[launch_grid](...)
 
     return outputs
 ```
 
-For now, assume the kernel `sum_kernel` is a valid Triton kernel. A valid triton kernel is called with the funky `kernel[launch_grid]()` syntax to denote **which version of the kernel you want to launch**. Think of it as a python dictionary where keys are different launch grid configurations and the values are the compiled kernels related to configuration.
+For now, assume the kernel `sum_kernel` is a valid Triton kernel. A valid triton kernel is called with the funky `kernel[launch_grid]()` syntax to denote **which version of the kernel you want to launch**. For now, think of it as a python dictionary where keys are different launch grid configurations and the values are the compiled kernels related to configuration.
 
 We can also divide the work into sets of rows *and* columns. If we keep the number of programs equal to 6, each program can also process two half rows. This will require a multidimensional launch grid `(2, 3)`:
 
