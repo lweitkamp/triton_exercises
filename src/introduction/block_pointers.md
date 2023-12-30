@@ -3,9 +3,7 @@
 Pointer arithmetic can be tedious work and it's easy to mess up.
 Not to mention that we have not worked with loading blocks of 2D data, introducing multidimensional pointer blocks.
 
-Let's steer clear of all that, and start using the block pointer functionality that is still an experimental feature.
-
-It changes the setup from this:
+Let's steer clear of all that, and start using the block pointer functionality that is still an experimental feature. It changes the setup from this:
 
 ```python
 :::import triton
@@ -81,7 +79,7 @@ def sum_kernel(A_ptr, outputs_ptr, M, N, A_strides_x, A_strides_y):
         order=(1, 0),
     )
 ```
-A little bit more work and more added arguments, but this allows us to load 1D and 2D blocks with ease, and we can also skip any masking for out-of-bounds memory access. 
+A little bit more work and more added arguments, but this allows us to load 1D and 2D blocks with ease, and we can also skip any masking for out-of-bounds memory access. The table below gives a brief description per argument.
 
 | abc         | def |
 |-------------|-----|
@@ -90,10 +88,55 @@ A little bit more work and more added arguments, but this allows us to load 1D a
 | strides     | Strides of the base tensor |
 | offsets     | From what location do you want to start loading data |
 | block_shape | What is the shape of the data block to load |
-| order       | ... |
+| order       | The memory layout of the base tensor |
 
-For some common access patterns, see the figure below.
+Want to load columns? Want to load blocks? No worries! Below are some examples of block pointers and figures representing the access patterns. You can see the hidden code too if you'd like, but its a spoiler for the rest of the introduction chapter.
+
+### Loading Columns
+```python
+offsets = tl.make_block_ptr(
+    base=A_ptr,
+    shape=(M, N),
+    strides=(input_stride_x, A_stride_y),
+    offsets=(0, program_id),
+    block_shape=(M, 1),
+    order=(1, 0),
+)
+```
+
+![With block pointers we can easily switch to loading columns instead of rows.](images/column-offsets.svg)
+
+### Loading Blocks of Rows
+```python
+offsets = tl.make_block_ptr(
+    base=A_ptr,
+    shape=(M, N),
+    strides=(input_stride_x, A_stride_y),
+    offsets=(0, program_id),
+    block_shape=(BLOCK_M, N),
+    order=(1, 0),
+)
+```
+![With block pointers we can also switch easily to blocks of rows.](images/block-offsets.svg)
 
 
 ## Advancing Block Pointers
-This section is more for reference since we will not have to advance any block pointers for the row-sum kernel. Imagine we are not capable of loading the entire row into memory - it's too big for our cache! What *can* do, is iterate over the row in blocks. the iterative part is where [`tl.advance`]()
+This section is more for reference since we will not have to advance any block pointers for the row-sum kernel. It *is* an important element of matrix multiplication kernel though. Imagine we are not capable of loading the entire row into memory - it's too big for our cache! What *can* do, is iterate over the row in blocks. the iterative part is where [`tl.advance`]() comes into play.
+
+We now load a vector length `BLOCK_N` and will have to do this untill we reach the end of the row, so we take steps from `0` to `N` in `BLOCK_N` steps:
+
+```python
+offsets = tl.make_block_ptr(
+    base=A_ptr,
+    shape=(M, N),
+    strides=(input_stride_x, A_stride_y),
+    offsets=(0, program_id),
+    block_shape=(1, BLOCK_N),
+    order=(1, 0),
+)
+
+for _ in range(0, N, BLOCK_N):
+    offsets = tl.advance(offsets, (0, BLOCK_N))
+```
+
+There are some consequences in terms of out-of-bounds memory access checking, but we will cover this is the next section.
