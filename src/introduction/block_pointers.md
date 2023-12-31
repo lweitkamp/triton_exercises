@@ -26,16 +26,20 @@ Let's steer clear of all that, and start using the block pointer functionality t
 :::
 :::    sum_kernel[launch_grid](
 :::        A, outputs,
-:::        BLOCK=N,
+:::        N=N,
 :::        A_strides_x=A.strides(0), A_strides_y=A.strides(1),
 :::    )
 :::
 :::    return outputs
 :::
 @triton.jit
-def sum_kernel(A_ptr, outputs_ptr, BLOCK, A_strides_x, A_strides_y):
+def sum_kernel(
+    A_ptr, outputs_ptr,
+    N,
+    A_strides_x, A_strides_y,
+):
     program_id = tl.program_id(axis=0)
-    offsets = tl.arange(0, BLOCK) + A_ptr + program_id * A_stride_y    
+    offsets = tl.arange(0, N) + A_ptr + program_id * A_stride_y
 ```
 
 To this:
@@ -59,16 +63,20 @@ To this:
 :::
 :::    launch_grid = (M, )
 :::
-:::    sum_kernel[launch_grid](
+:::    sum_row_kernel[launch_grid](
 :::        A, outputs,
-:::        BLOCK=N,
-:::        A_strides_x=A.strides(0), A_strides_y=A.strides(1),
+:::        M=M, N=N,
+:::        A_strides_x=A.stride(0), A_strides_y=A.stride(1),
 :::    )
 :::
 :::    return outputs
 :::
 @triton.jit
-def sum_kernel(A_ptr, outputs_ptr, M, N, A_strides_x, A_strides_y):
+def sum_row_kernel(
+    A_ptr, outputs_ptr,
+    M, N,
+    input_stride_x, input_stride_y,
+):
     program_id = tl.program_id(axis=0)
     offsets = tl.make_block_ptr(
         base=A_ptr,
@@ -90,40 +98,90 @@ A little bit more work and more added arguments, but this allows us to load 1D a
 | block_shape | What is the shape of the data block to load |
 | order       | The memory layout of the base tensor |
 
-Want to load columns? Want to load blocks? No worries! Below are some examples of block pointers and figures representing the access patterns. You can see the hidden code too if you'd like, but its a spoiler for the rest of the introduction chapter.
+## Block Pointers in 2D and Dynamic Launch Grids
+We mentioned earlier that block pointers make 2D loading easier too. As an example, let's transform the block pointer to load not one row, but 2 or potentially more as the following figure indicates:
 
-### Loading Columns
-```python
-offsets = tl.make_block_ptr(
-    base=A_ptr,
-    shape=(M, N),
-    strides=(input_stride_x, A_stride_y),
-    offsets=(0, program_id),
-    block_shape=(M, 1),
-    order=(1, 0),
-)
-```
-
-![With block pointers we can easily switch to loading columns instead of rows.](images/column-offsets.svg)
-
-### Loading Blocks of Rows
-```python
-offsets = tl.make_block_ptr(
-    base=A_ptr,
-    shape=(M, N),
-    strides=(input_stride_x, A_stride_y),
-    offsets=(0, program_id),
-    block_shape=(BLOCK_M, N),
-    order=(1, 0),
-)
-```
 ![With block pointers we can also switch easily to blocks of rows.](images/block-offsets.svg)
+
+This has consequences for the launch grid, though. We would essentially need half as much programs to be launched if we load 2 rows each time. But what if we load 4 rows each? That would reduce the number of programs by half again. Instead of statically changing the launch grid each time, we can make it ***dynamic***.
+
+The launch grid is not defined only to be a tuple of integers, it can also be a callable that *returns* a tuple of integers. This callable has as input the parameters of the kernel so we can dynamically select the number of programs to be launched as a function of the number of rows we process:
+
+```python
+:::import triton
+:::import triton.language as tl
+:::import torch
+:::
+def sum_row_blocked(A: torch.Tensor) -> torch.Tensor:
+:::    """Calculate the sum of a tensor A along the final dim.
+:::
+:::    Args:
+:::        A: Tensor of shape (M, N) containing the input values.
+:::
+:::    Returns:
+:::        Tensor of shape (M, ) containing the summed values.
+:::    """
+    M, N = A.shape
+    outputs = torch.empty((M,), dtype=A.dtype, device=A.device)
+
+    dynamic_launch_grid = lambda params: (triton.cdiv(M, params["BLOCK_M"]), )
+    sum_row_blocked_kernel[dynamic_launch_grid](
+        A_ptr=A, outputs_ptr=outputs,
+        M=M, N=N,
+        A_strides_x=A.stride(0), A_strides_y=A.stride(1),
+        BLOCK_M=2,
+    )
+
+    return outputs
+
+
+@triton.jit
+def sum_row_blocked_kernel(
+    A_ptr, outputs_ptr,
+    M, N,
+    BLOCK_M,
+    A_strides_x, A_strides_y,
+):
+:::    """Calculate the sum of a row of the input tensor, storing the result in
+:::    the output. We assume the input row fits into SRAM.
+:::
+:::    Args:
+:::        A_ptr: Pointer to the input tensor.
+:::        outputs_ptr: Pointer to the output tensor.
+:::        M: Number of rows in the input tensor.
+:::        N: Number of columns in the input tensor.
+:::        input_stride_x: Stride of the input tensor along the row dim.
+:::        input_stride_y: Stride of the input tensor along the column dim.
+:::    """
+    program_id = tl.program_id(axis=0)
+:::
+    input_block_ptr = tl.make_block_ptr(
+        base=A_ptr,
+        shape=(M, N),
+        strides=(A_strides_x, A_strides_y),
+        offsets=(program_id * BLOCK_M, 0),
+        block_shape=(BLOCK_M, N),
+        order=(1, 0),
+    )
+:::    output_block_ptr = tl.make_block_ptr(
+:::        base=outputs_ptr,
+:::        shape=(M, ),
+:::        strides=(1, ),
+:::        offsets=(program_id * BLOCK_M, ),
+:::        block_shape=(BLOCK_M, ),
+:::        order=(0, ),
+:::    )
+:::
+:::    input_block = tl.load(input_block_ptr)
+:::
+:::    tl.store(output_block_ptr, tl.sum(input_block, axis=1))
+```
 
 
 ## Advancing Block Pointers
-This section is more for reference since we will not have to advance any block pointers for the row-sum kernel. It *is* an important element of matrix multiplication kernel though. Imagine we are not capable of loading the entire row into memory - it's too big for our cache! What *can* do, is iterate over the row in blocks. the iterative part is where [`tl.advance`]() comes into play.
+In most situations we can easily load the whole row into memory and process a row or even a set of rows per program. But imagine we are not capable of loading the entire row into memory - it's too big for our cache! What *can* do, is iterate over the row in blocks. 
 
-We now load a vector length `BLOCK_N` and will have to do this untill we reach the end of the row, so we take steps from `0` to `N` in `BLOCK_N` steps:
+the iterative part is where [`tl.advance`](https://github.com/openai/triton/blob/f107df16a07dda3001b466d764ed87a69a56c60e/python/triton/language/core.py#L1179) comes into play. For some extra parallelisms, we will load in blocks of M rows (`BLOCK_M`) of length `BLOCK_N` << `N`.
 
 ```python
 offsets = tl.make_block_ptr(

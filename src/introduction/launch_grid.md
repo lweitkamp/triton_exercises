@@ -27,7 +27,7 @@ def sum_row(A: torch.Tensor) -> torch.Tensor:
 
     launch_grid = (M, )
 
-    sum_kernel[launch_grid](...)
+    sum_row_kernel[launch_grid](...)
 
     return outputs
 ```
@@ -54,7 +54,7 @@ We can also divide the work into sets of rows *and* columns. If we keep the numb
 :::
     launch_grid = (M // 3, N // 2)
 :::
-:::    sum_kernel[launch_grid](
+:::    sum_row_kernel[launch_grid](
 :::        input_ptr=inputs, output_ptr=outputs,
 :::        M=M, N=N,
 :::        input_stride_x=inputs.stride(0), input_stride_y=inputs.stride(1),

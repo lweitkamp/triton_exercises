@@ -62,13 +62,13 @@ def sum_row(A: torch.Tensor) -> torch.Tensor:
 :::
     launch_grid = (M, )
 :::
-    sum_kernel[launch_grid](A, outputs)
+    sum_row_kernel[launch_grid](A, outputs)
 :::
     return outputs
 
 
 @triton.jit
-def sum_kernel(A_ptr, outputs_ptr):
+def sum_row_kernel(A_ptr, outputs_ptr):
     # A_ptr is now a pointer towards its first element, similar for outputs_ptr.
 ```
 

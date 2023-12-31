@@ -8,7 +8,6 @@
   - [`triton.jit`](./introduction/triton_jit.md)
   - [Program Identifiers](./introduction/program_identifiers.md)
   - [Block Pointers](./introduction/block_pointers.md)
-  - [Loading and Storing Data](./introduction/data_io.md)
   - [Manipulating Data](./introduction/data_manipulating.md)
 - [Simple Kernels]()
   - [Vector Addition]()

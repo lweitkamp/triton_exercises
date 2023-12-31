@@ -21,12 +21,12 @@ def sum_row(A: torch.Tensor) -> torch.Tensor:
 :::
     launch_grid = (M, )
 :::
-    sum_kernel[launch_grid](A, outputs)
+    sum_row_kernel[launch_grid](A, outputs)
 :::
     return outputs
 
 @triton.jit
-def sum_kernel(A_ptr, outputs_ptr):
+def sum_row_kernel(A_ptr, outputs_ptr):
     program_id = tl.program_id(axis=0)
 ```
 
@@ -39,7 +39,7 @@ This will work if our input \\(A\\) has usual strides, but we can't guarantee on
 In general, we can't guarantee inside the kernel that any of the strides are regular, so even for a step into the \\(x\\) direction we will need to know the strides. For vectors this is a different story, as there torch always has a stride of 1 there.
 
 
-We can add the strides to the kernel, and with that done, the offset can be calculated as `offset = A_ptr + A_stride_y * program_id`. That only gives us the pointer to the correct row, though. We need pointers to the *entire* row block. So we will actually need to know the length of the row too (typically the block size you want to load is always denoted uppercase `BLOCK`), another argument we add to the kernel. Getting a block of pointers is straightforward, however, since we can use `triton.language.arange(0, BLOCK)`. the [`triton.language.arange`](https://triton-lang.org/main/python-api/generated/triton.language.arange.html#triton.language.arange) function is very similar to its NumPy and Torch counterparts. Now we are loading the right block!
+We can add the strides to the kernel, and with that done, the offset can be calculated as `offset = A_ptr + A_stride_y * program_id`. That only gives us the pointer to the correct row, though. We need pointers to the *entire* row block. So we will actually need to know the length of the row too, another argument we add to the kernel. Getting a block of pointers is straightforward, however, since we can use `triton.language.arange(0, N)`. the [`triton.language.arange`](https://triton-lang.org/main/python-api/generated/triton.language.arange.html#triton.language.arange) function is very similar to its NumPy and Torch counterparts. Now we are loading the right block!
 
 ![When we multiply the program identifier with the y-stride and add it to the input pointer we get the right memory block.](images/right-offsets.svg)
 
@@ -64,9 +64,9 @@ def sum_row(A: torch.Tensor) -> torch.Tensor:
 :::
     launch_grid = (M, )
 :::
-    sum_kernel[launch_grid](
+    sum_row_kernel[launch_grid](
         A, outputs,
-        BLOCK=N,
+        N=N,
         A_strides_x=A.strides(0), A_strides_y=A.strides(1),
     
     )
@@ -74,9 +74,13 @@ def sum_row(A: torch.Tensor) -> torch.Tensor:
     return outputs
 
 @triton.jit
-def sum_kernel(A_ptr, outputs_ptr, BLOCK, A_strides_x, A_strides_y):
+def sum_row_kernel(
+    A_ptr, outputs_ptr,
+    N,
+    A_strides_x, A_strides_y,
+):
     program_id = tl.program_id(axis=0)
-    offsets = tl.arange(0, BLOCK) + A_ptr + program_id * A_stride_y    
+    offsets = tl.arange(0, N) + A_ptr + program_id * A_stride_y    
 ```
 
 Pointer arithmetic is not always obvious though, and there is a better albeit experimental way to create block pointers that will now discuss.
