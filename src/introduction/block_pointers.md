@@ -205,7 +205,8 @@ It's impressive how little code we had to change to switch from 1D to 2D, so blo
 ## Advancing Block Pointers
 In most situations we can easily load the whole row into memory and process a row or even a set of rows per program. But imagine we are not capable of loading the entire row into memory - it's too big for our cache! What *can* do, is iterate over the row in blocks. 
 
-the iterative part is where [`tl.advance`](https://github.com/openai/triton/blob/f107df16a07dda3001b466d764ed87a69a56c60e/python/triton/language/core.py#L1179) comes into play. For some extra parallelisms, we will load in blocks of M rows (`BLOCK_M`) of length `BLOCK_N` << `N`.
+the iterative part is where [`tl.advance`](https://github.com/openai/triton/blob/f107df16a07dda3001b466d764ed87a69a56c60e/python/triton/language/core.py#L1179) comes into play.
+Each program will load a block of size `BLOCK_N` << `N` and iterate untill it has seen the full row.
 
 ```python
 :::import torch
@@ -225,12 +226,11 @@ def sum_row_blocked_iterative(A: torch.Tensor) -> torch.Tensor:
     M, N = A.shape
     outputs = torch.empty((M,), dtype=A.dtype, device=A.device)
 
-    dynamic_launch_grid = lambda params: (triton.cdiv(M, params["BLOCK_M"]), )
-    sum_row_blocked_iterative_kernel[dynamic_launch_grid](
+    sum_row_blocked_iterative_kernel[(M, )](
         A_ptr=A, outputs_ptr=outputs,
         M=M, N=N,
         A_strides_x=A.stride(0), A_strides_y=A.stride(1),
-        BLOCK_M=2, BLOCK_N=8,
+        BLOCK_N=8,
     )
 
     return outputs
@@ -240,7 +240,7 @@ def sum_row_blocked_iterative(A: torch.Tensor) -> torch.Tensor:
 def sum_row_blocked_iterative_kernel(
     A_ptr, outputs_pt,
     M, N,
-    BLOCK_M, BLOCK_N,
+    BLOCK_N,
     A_strides_x, A_strides_y,
 ):
 :::    """Calculate the sum of a row of the input tensor, storing the result in
@@ -260,20 +260,20 @@ def sum_row_blocked_iterative_kernel(
         base=A_ptr,
         shape=(M, N),
         strides=(A_strides_x, A_strides_y),
-        offsets=(program_id * BLOCK_M, 0),
-        block_shape=(BLOCK_M, BLOCK_N),
+        offsets=(program_id, 0),
+        block_shape=(1, BLOCK_N),
         order=(1, 0),
     )
 :::    output_block_ptr = tl.make_block_ptr(
 :::        base=outputs_ptr,
 :::        shape=(M, ),
 :::        strides=(1, ),
-:::        offsets=(program_id * BLOCK_M, ),
-:::        block_shape=(BLOCK_M, ),
+:::        offsets=(program_id, ),
+:::        block_shape=(1, ),
 :::        order=(0, ),
 :::    )
 
-:::    accumulator = tl.zeros((BLOCK_M, ), dtype=tl.float32)
+:::    accumulator = tl.zeros((1, ), dtype=tl.float32)
     for _ in range(0, N, BLOCK_N):
         input_block = tl.load(input_block_ptr)
 :::        accumulator += tl.sum(input_block, axis=1)
