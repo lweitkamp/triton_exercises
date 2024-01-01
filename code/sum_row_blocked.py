@@ -1,0 +1,75 @@
+import pytest
+import torch
+import triton
+import triton.language as tl
+
+
+@triton.jit
+def sum_row_blocked_kernel(
+    A_ptr: tl.tensor, outputs_ptr: tl.tensor,
+    M: tl.constexpr, N: tl.constexpr,
+    BLOCK_M: tl.constexpr,
+    A_strides_x, A_strides_y,
+):
+    """Calculate the sum of a row of the input tensor, storing the result in
+    the output. We assume the input row fits into SRAM.
+
+    Args:
+        A_ptr: Pointer to the input tensor.
+        outputs_ptr: Pointer to the output tensor.
+        M: Number of rows in the input tensor.
+        N: Number of columns in the input tensor.
+        input_stride_x: Stride of the input tensor along the row dim.
+        input_stride_y: Stride of the input tensor along the column dim.
+    """
+    program_id = tl.program_id(axis=0)
+
+    input_block_ptr = tl.make_block_ptr(
+        base=A_ptr,
+        shape=(M, N),
+        strides=(A_strides_x, A_strides_y),
+        offsets=(program_id * BLOCK_M, 0),
+        block_shape=(BLOCK_M, N),
+        order=(1, 0),
+    )
+    output_block_ptr = tl.make_block_ptr(
+        base=outputs_ptr,
+        shape=(M, ),
+        strides=(1, ),
+        offsets=(program_id * BLOCK_M, ),
+        block_shape=(BLOCK_M, ),
+        order=(0, ),
+    )
+
+    input_block = tl.load(input_block_ptr)
+
+    tl.store(output_block_ptr, tl.sum(input_block, axis=1))
+
+
+def sum_row_blocked(A: torch.Tensor) -> torch.Tensor:
+    """Calculate the sum of a tensor A along the final dim.
+
+    Args:
+        A: Tensor of shape (M, N) containing the input values.
+
+    Returns:
+        Tensor of shape (M, ) containing the summed values.
+    """
+    M, N = A.shape
+    outputs = torch.empty((M,), dtype=A.dtype, device=A.device)
+
+    sum_row_blocked_kernel[lambda params: (triton.cdiv(M, params["BLOCK_M"]), )](
+        A_ptr=A, outputs_ptr=outputs,
+        M=M, N=N,
+        A_strides_x=A.stride(0), A_strides_y=A.stride(1),
+        BLOCK_M=2,
+    )
+
+    return outputs
+
+
+@pytest.mark.parametrize("M, N", [(16, 16), (32, 16)])
+def test_sum_row_blocked(M: int, N: int):
+    inputs = torch.randn((M, N), device='cuda')
+    outputs = sum_row_blocked(inputs)
+    torch.testing.assert_close(inputs.sum(dim=1), outputs)
