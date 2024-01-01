@@ -2,6 +2,29 @@
 
 Pointer arithmetic can be tedious work and it's easy to mess up.
 Not to mention that we have not worked with loading blocks of 2D data, introducing multidimensional pointer blocks.
+From the official [Triton tutorial on matrix multiplications](https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html), the following snippet shows how this 2D arithmetic works:
+
+```python
+# Program ID
+pid = tl.program_id(axis=0)
+# Number of program ids along the M axis
+num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
+# Number of programs ids along the N axis
+num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
+# Number of programs in group
+num_pid_in_group = GROUP_SIZE_M * num_pid_n
+# Id of the group this program is in
+group_id = pid // num_pid_in_group
+# Row-id of the first program in the group
+first_pid_m = group_id * GROUP_SIZE_M
+# If `num_pid_m` isn't divisible by `GROUP_SIZE_M`, the last group is smaller
+group_size_m = min(num_pid_m - first_pid_m, GROUP_SIZE_M)
+# *Within groups*, programs are ordered in a column-major order
+# Row-id of the program in the *launch grid*
+pid_m = first_pid_m + (pid % group_size_m)
+# Col-id of the program in the *launch grid*
+pid_n = (pid % num_pid_in_group) // group_size_m
+```
 
 Let's steer clear of all that, and start using the block pointer functionality that is still an experimental feature. It changes the setup from this:
 
@@ -177,6 +200,7 @@ def sum_row_blocked_kernel(
 :::    tl.store(output_block_ptr, tl.sum(input_block, axis=1))
 ```
 
+It's impressive how little code we had to change to switch from 1D to 2D, so block pointers are definitely my go-to for getting data offsets.
 
 ## Advancing Block Pointers
 In most situations we can easily load the whole row into memory and process a row or even a set of rows per program. But imagine we are not capable of loading the entire row into memory - it's too big for our cache! What *can* do, is iterate over the row in blocks. 
@@ -184,17 +208,78 @@ In most situations we can easily load the whole row into memory and process a ro
 the iterative part is where [`tl.advance`](https://github.com/openai/triton/blob/f107df16a07dda3001b466d764ed87a69a56c60e/python/triton/language/core.py#L1179) comes into play. For some extra parallelisms, we will load in blocks of M rows (`BLOCK_M`) of length `BLOCK_N` << `N`.
 
 ```python
-offsets = tl.make_block_ptr(
-    base=A_ptr,
-    shape=(M, N),
-    strides=(input_stride_x, A_stride_y),
-    offsets=(0, program_id),
-    block_shape=(1, BLOCK_N),
-    order=(1, 0),
-)
+:::import torch
+:::import triton
+:::import triton.language as tl
+:::
+:::
+def sum_row_blocked_iterative(A: torch.Tensor) -> torch.Tensor:
+:::    """Calculate the sum of a tensor A along the final dim.
+:::
+:::    Args:
+:::        A: Tensor of shape (M, N) containing the input values.
+:::
+:::    Returns:
+:::        Tensor of shape (M, ) containing the summed values.
+:::    """
+    M, N = A.shape
+    outputs = torch.empty((M,), dtype=A.dtype, device=A.device)
 
-for _ in range(0, N, BLOCK_N):
-    offsets = tl.advance(offsets, (0, BLOCK_N))
+    dynamic_launch_grid = lambda params: (triton.cdiv(M, params["BLOCK_M"]), )
+    sum_row_blocked_iterative_kernel[dynamic_launch_grid](
+        A_ptr=A, outputs_ptr=outputs,
+        M=M, N=N,
+        A_strides_x=A.stride(0), A_strides_y=A.stride(1),
+        BLOCK_M=2, BLOCK_N=8,
+    )
+
+    return outputs
+
+
+@triton.jit
+def sum_row_blocked_iterative_kernel(
+    A_ptr, outputs_pt,
+    M, N,
+    BLOCK_M, BLOCK_N,
+    A_strides_x, A_strides_y,
+):
+:::    """Calculate the sum of a row of the input tensor, storing the result in
+:::    the output. We assume the input row fits into SRAM.
+:::
+:::    Args:
+:::        A_ptr: Pointer to the input tensor.
+:::        outputs_ptr: Pointer to the output tensor.
+:::        M: Number of rows in the input tensor.
+:::        N: Number of columns in the input tensor.
+:::        input_stride_x: Stride of the input tensor along the row dim.
+:::        input_stride_y: Stride of the input tensor along the column dim.
+:::    """
+    program_id = tl.program_id(axis=0)
+
+    input_block_ptr = tl.make_block_ptr(
+        base=A_ptr,
+        shape=(M, N),
+        strides=(A_strides_x, A_strides_y),
+        offsets=(program_id * BLOCK_M, 0),
+        block_shape=(BLOCK_M, BLOCK_N),
+        order=(1, 0),
+    )
+:::    output_block_ptr = tl.make_block_ptr(
+:::        base=outputs_ptr,
+:::        shape=(M, ),
+:::        strides=(1, ),
+:::        offsets=(program_id * BLOCK_M, ),
+:::        block_shape=(BLOCK_M, ),
+:::        order=(0, ),
+:::    )
+
+:::    accumulator = tl.zeros((BLOCK_M, ), dtype=tl.float32)
+    for _ in range(0, N, BLOCK_N):
+        input_block = tl.load(input_block_ptr)
+:::        accumulator += tl.sum(input_block, axis=1)
+        input_block_ptr = tl.advance(input_block_ptr, (0, BLOCK_N))
+:::
+:::    tl.store(output_block_ptr, accumulator)
 ```
 
 There are some consequences in terms of out-of-bounds memory access checking, but we will cover this is the next section.
