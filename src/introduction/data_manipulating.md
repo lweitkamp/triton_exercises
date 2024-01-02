@@ -22,10 +22,9 @@ As in Torch, Triton has a variety of ways to start a tensor. We could use `tl.fu
 What you might often see is that regardless of the precision that comes in (if \\(A\\) is `torch.bfloat` or `torch.float16`), accumulation will be done in `tl.float32` to achieve the highest precision available.
 There is not much downside here since the accumulation is typically small in shape and the data requires is already loaded, so no memory bandwidth wasted here. 
 
-## Type Annotations
 
 ## The Final Iterative Sum Kernel
-We can now load and store data and we have a way to keep track of accumulative sums of the blocks of a row. In case `N` is not divible by `BLOCK_N` we can load using a `boundary_check`. We can add this check in any case and see later what the cost of this check is during the optimization section. We've added type annotations to ensure XYZ. The final kernel is then as follows:
+We can now load and store data and we have a way to keep track of accumulative sums of the blocks of a row. In case `N` is not divible by `BLOCK_N` we can load using a `boundary_check`. We can add this check in any case and see later what the cost of this check is during the optimization section. The final kernel is then as follows:
 
 ```python
 :::import torch
@@ -102,4 +101,4 @@ def sum_row_blocked_iterative_kernel(
     tl.store(output_block_ptr, accumulator)
 ```
 
-I hope this was a useful primer on Triton so far. The next chapters will delve into some more kernels but in a more straightforward manner.
+I hope this was a useful primer on Triton so far. The next chapter will delve into benchmarking and optimizing kernels. For complete code to the sum kernels you can check the [code](https://github.com/lweitkamp/triton_exercises/tree/main/code) folder, there will be three versions: simple row sum, blocked row sum and iterative row sum, each discussed in some parts in this chapter.

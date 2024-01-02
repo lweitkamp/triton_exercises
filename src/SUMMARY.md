@@ -9,12 +9,9 @@
   - [Program Identifiers](./introduction/program_identifiers.md)
   - [Block Pointers](./introduction/block_pointers.md)
   - [Manipulating Data](./introduction/data_manipulating.md)
-- [Simple Kernels]()
-  - [Vector Addition]()
-  - [Row Sum]()
-
-- [Benchmarking]()
 - [Optimization]()
+  - [Benchmarking]()
+  - [Optimization]()
 - [Further References]()
 
 ---
